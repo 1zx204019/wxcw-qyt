@@ -76,6 +76,8 @@ static void DisplayPage26(void);
 static void InitSlaveHistoryIndices(void);
 static void ClearAllHistoryData(void);
 static void ClearMaxTemperatureData(void);  // 新增：清除最高温度数据
+
+static void DisplayRTCOnPage24(void);
 // ------------------- 菜单初始化 -------------------
 void Menu_Init(void) {
     menu_state.current_page = PAGE_1;
@@ -395,6 +397,11 @@ static void UpdateRTCRefresh(void) {
         DisplayRTCOnPage1();
         need_rtc_refresh = 0;
     }
+		else if (need_rtc_refresh && menu_state.current_page == PAGE_24) {
+        GetCurrentRTC();
+        DisplayRTCOnPage24();
+        need_rtc_refresh = 0;
+    }
 }
 // ------------------- 显示固定标签 -------------------
 static void DisplayFixedLabels(void)
@@ -445,7 +452,7 @@ static void DisplayFixedLabels(void)
                 GetCurrentRTC();
                 DisplayRTCOnPage1();
                 break;
-                break;
+               
                 
             case PAGE_2:
                 DisplayPage2();  // 显示PAGE_2内容
@@ -505,6 +512,13 @@ static void DisplayFixedLabels(void)
                 break;
 						case PAGE_24:  // 新增：最高温度查询页面
                 DisplayPage24();
+						
+//							 LCD_ClearPages(2, 5);
+                
+                // 初始显示RTC时间
+                GetCurrentRTC();
+                DisplayRTCOnPage24();
+               
                 break;
             case PAGE_25:  // 新增：最高温度清除确认页面
                 DisplayPage25();
@@ -1341,11 +1355,11 @@ static void DisplayPage24(void)
     LCD_DISPLAYCHAR_NEW(2, 0, 2, 20);  // "时"
     LCD_DISPLAYCHAR_NEW(2, 8, 3, 20);  // "间"
     
-    // 第二行: 年-月-日
-    LCD_DisplayString(0, 32, "2024-12-22");
-    
-    // 第三行: 时:分:秒
-    LCD_DisplayString(4, 32, "15:30:45");
+//    // 第二行: 年-月-日
+//    LCD_DisplayString(0, 32, "2024-12-22");
+//    
+//    // 第三行: 时:分:秒
+//    LCD_DisplayString(4, 32, "15:30:45");
     
     // 第四行: 上一项
     LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);  // "上"
@@ -1363,6 +1377,45 @@ static void DisplayPage24(void)
     LCD_DISPLAYCHAR_NEW(6, 120, 1, 11);  // "回"
 }
 
+
+static void DisplayRTCOnPage24(void) {
+    unsigned char temp;
+    
+    // 第2行显示日期：YYYY-MM-DD（与page1位置一致）
+    LCD_DisplayChar(0, 32, '2');
+    LCD_DisplayChar(0, 40, '0');
+    temp = (current_rtc_time.year / 10);
+    LCD_DisplayChar(0, 48, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.year % 10);
+    LCD_DisplayChar(0, 56, (temp > 9 ? 9 : temp) + '0');
+    LCD_DisplayChar(0, 64, '-');
+    temp = (current_rtc_time.mon / 10);
+    LCD_DisplayChar(0, 72, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.mon % 10);
+    LCD_DisplayChar(0, 80, (temp > 9 ? 9 : temp) + '0');
+    LCD_DisplayChar(0, 88, '-');
+    temp = (current_rtc_time.day / 10);
+    LCD_DisplayChar(0, 96, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.day % 10);
+    LCD_DisplayChar(0, 104, (temp > 9 ? 9 : temp) + '0');
+    
+    // 第4行显示时间：HH:MM:SS
+    temp = (current_rtc_time.hour / 10);
+    LCD_DisplayChar(2, 32, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.hour % 10);
+    LCD_DisplayChar(2, 40, (temp > 9 ? 9 : temp) + '0');
+//    LCD_DisplayChar(2, 48, ':');
+		LCD_DISPLAYCHAR_NEW(2, 48, 0, 15);
+    temp = (current_rtc_time.min / 10);
+    LCD_DisplayChar(2, 56, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.min % 10);
+    LCD_DisplayChar(2, 64, (temp > 9 ? 9 : temp) + '0');
+    LCD_DISPLAYCHAR_NEW(2, 72, 0, 15);
+    temp = (current_rtc_time.sec / 10);
+    LCD_DisplayChar(2, 80, (temp > 9 ? 9 : temp) + '0');
+    temp = (current_rtc_time.sec % 10);
+    LCD_DisplayChar(2, 88, (temp > 9 ? 9 : temp) + '0');
+}
 // ------------------- 显示PAGE_25(修改密码详情) -------------------
 static void DisplayPage25(void)
 {
