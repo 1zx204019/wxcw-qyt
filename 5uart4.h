@@ -243,6 +243,12 @@ void UpdateRTCRefresh(void);
 void InitDataStorage(void);
 void AddDataToSummary(unsigned char pid, unsigned char aid, unsigned char temp, 
                      unsigned char volt1, unsigned char volt2, unsigned char fosc);
+
+
+// 在文件末尾的函数声明部分添加
+void DeleteAlarmEvent(unsigned char index);
+void ClearAllAlarmEvents(void);
+
 DataRecord* GetRecentDataByAID(unsigned char aid);
 unsigned long GetSystemTick(void);
 
