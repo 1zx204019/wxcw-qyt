@@ -2318,9 +2318,18 @@ void LCD_HandleKey(unsigned char key) {
                 display_labels_initialized = 0;
             } else if (current_page == PAGE_12) {
            
-                menu_state.current_page = PAGE_11;
-                menu_state.page_changed = 1;
-                display_labels_initialized = 0;
+                if (menu_state.page10_selected < alarm_event_count) {
+            DeleteAlarmEvent(menu_state.page10_selected);
+        }
+        
+        // 返回到PAGE_10（报警事件列表）
+        menu_state.current_page = PAGE_10;
+        menu_state.page_changed = 1;
+        display_labels_initialized = 0;
+//        
+//        // 发送调试信息
+//        UART4_SendString("Alarm event deleted and returning to list.\r\n");
+        return;
             } else if (current_page == PAGE_15) {
                 // 从预警详细页面进入删除确认（新增）
                 menu_state.prev_page = PAGE_15;
@@ -3229,5 +3238,65 @@ static void AddToHistoryData(unsigned char pid, unsigned char aid, unsigned char
 
 
 
+// ------------------- 删除指定报警事件 -------------------
+void DeleteAlarmEvent(unsigned char display_index) {
+    unsigned char actual_index;
+    unsigned char i;
+	unsigned char idx;
+	unsigned char j;
+    if (display_index >= alarm_event_count) {
+        return; // 无效索引
+    }
+    
+    // 计算实际数组索引（最新的在前面）
+    actual_index = (alarm_event_next_index - display_index - 1 + MAX_ALARM_EVENTS) % MAX_ALARM_EVENTS;
+    
+    if (alarm_events[actual_index].is_valid) {
+        // 标记为无效
+        alarm_events[actual_index].is_valid = 0;
+        
+        // 如果是循环队列中的最后一个有效事件，减少计数
+        if (display_index == 0 && alarm_event_count > 0) {
+            // 移动索引，覆盖被删除的事件
+            alarm_event_next_index = (alarm_event_next_index - 1 + MAX_ALARM_EVENTS) % MAX_ALARM_EVENTS;
+            alarm_event_count--;
+            
+            // 更新其他事件的显示索引
+            for (i = 0; i < alarm_event_count; i++) {
+                idx = (alarm_event_next_index - i - 1 + MAX_ALARM_EVENTS) % MAX_ALARM_EVENTS;
+                if (!alarm_events[idx].is_valid) {
+                    // 找到下一个有效事件
+                    for (j = idx; j != alarm_event_next_index; j = (j - 1 + MAX_ALARM_EVENTS) % MAX_ALARM_EVENTS) {
+                        if (alarm_events[(j + 1) % MAX_ALARM_EVENTS].is_valid) {
+                            // 复制下一个有效事件到当前位置
+                            alarm_events[j] = alarm_events[(j + 1) % MAX_ALARM_EVENTS];
+                            alarm_events[(j + 1) % MAX_ALARM_EVENTS].is_valid = 0;
+                        }
+                    }
+                }
+            }
+        }
+        
+        UART4_SendString("Alarm event deleted.\r\n");
+    }
+}
 
+// ------------------- 清空所有报警事件 -------------------
+void ClearAllAlarmEvents(void) {
+    unsigned char i;
+    
+    for (i = 0; i < MAX_ALARM_EVENTS; i++) {
+        alarm_events[i].is_valid = 0;
+    }
+    
+    alarm_event_count = 0;
+    alarm_event_next_index = 0;
+    
+    // 重置报警状态跟踪数组
+    for (i = 0; i < TOTAL_SLAVES; i++) {
+        last_abnormal_status[i] = 0;
+    }
+    
+    UART4_SendString("All alarm events cleared.\r\n");
+}
 
