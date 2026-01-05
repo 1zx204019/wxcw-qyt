@@ -1281,52 +1281,53 @@ static void DisplayPage12(void) {
 
 // ------------------- 显示PAGE_13(温度预警时间列表) -------------------
 static void DisplayPage13(void) {
-    unsigned char i;
+        unsigned char i;
     unsigned char row;
     
-
-    LCD_Clear();
-    
-
-    for (i = 0; i < 3; i++) {
-        row = i * 2;  
-
-        if (i == menu_state.page13_selected) {
-            LCD_DISPLAYCHAR_NEW(row, 0, 0, 25); 
-        } else {
-            LCD_DisplayChar(row, 0, ' ');
+    // 只在需要初始化时清屏和绘制固定标签
+    if (display_labels_initialized == 0) {
+        LCD_Clear();
+        
+        // 绘制固定标签
+        for (i = 0; i < 3; i++) {
+            row = i * 2;  
+            
+            if (i == menu_state.page10_selected) {
+                LCD_DISPLAYCHAR_NEW(row, 0, 0, 25);  
+            } else {
+                LCD_DisplayChar(row, 0, ' ');
+            }
+            
+            LCD_DISPLAYCHAR_NEW(row, 8, 2, 19);   // "事"
+            LCD_DISPLAYCHAR_NEW(row, 16, 3, 19);  // "件"
+            LCD_DisplayChar(row, 24, '1' + i);    // 编号
+            
+            // 显示"时间："标签（位置可能需要调整）
+            LCD_DISPLAYCHAR_NEW(row, 40, 2, 20); // "时"
+            LCD_DISPLAYCHAR_NEW(row, 48, 3, 20); // "间"
+            LCD_DISPLAYCHAR_NEW(row, 56, 0, 15); // ":"
         }
         
-        // ??"??"???
-        LCD_DISPLAYCHAR_NEW(row, 8, 2, 19);  
-        LCD_DISPLAYCHAR_NEW(row, 16, 3, 19); 
-        LCD_DisplayChar(row, 24, '1' + i);   
+        // 功能提示
+        LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
+        LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);   // "一"
+        LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);  // "页"
+        
+        LCD_DISPLAYCHAR_NEW(6, 40, 3, 4);  // "上"
+        LCD_DISPLAYCHAR_NEW(6, 48, 1, 4);  // "一"
+        LCD_DISPLAYCHAR_NEW(6, 56, 2, 4);  // "页"
+        
+        LCD_DISPLAYCHAR_NEW(6, 80, 0, 26); // "详"
+        LCD_DISPLAYCHAR_NEW(6, 88, 1, 26); // "情"
+        
+        LCD_DISPLAYCHAR_NEW(6, 112, 0, 11); // "返"
+        LCD_DISPLAYCHAR_NEW(6, 120, 1, 11); // "回"
+        
+        display_labels_initialized = 1;
     }
     
-    // ?6?:????
-    LCD_DISPLAYCHAR_NEW(0, 40, 2, 20); 
-    LCD_DISPLAYCHAR_NEW(0, 48, 3, 20); 
-    LCD_DISPLAYCHAR_NEW(0, 56, 0, 15); 
-    LCD_DISPLAYCHAR_NEW(2, 40, 2, 20); 
-    LCD_DISPLAYCHAR_NEW(2, 48, 3, 20); 
-    LCD_DISPLAYCHAR_NEW(2, 56, 0, 15); 
-    LCD_DISPLAYCHAR_NEW(4, 40, 2, 20); 
-    LCD_DISPLAYCHAR_NEW(4, 48, 3, 20); 
-    LCD_DISPLAYCHAR_NEW(4, 56, 0, 15); 
-        
-    LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);  
-    LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);  
-    LCD_DISPLAYCHAR_NEW(6, 16, 2, 4); 
-    
-    LCD_DISPLAYCHAR_NEW(6, 40, 3, 4); 
-    LCD_DISPLAYCHAR_NEW(6, 48, 1, 4); 
-    LCD_DISPLAYCHAR_NEW(6, 56, 2, 4); 
-    
-    LCD_DISPLAYCHAR_NEW(6, 72, 0, 26);
-    LCD_DISPLAYCHAR_NEW(6, 80, 1, 26);
-        
-    LCD_DISPLAYCHAR_NEW(6, 112, 0, 11);  
-    LCD_DISPLAYCHAR_NEW(6, 120, 1, 11);  
+    // 显示报警事件数据（只刷新数据部分，不清屏）
+    DisplayAlarmEventsOnPage10();
 }
 
 
@@ -1387,41 +1388,7 @@ static void DisplayPage14(void) {
 }
 
 
-//static void DisplayRecoveryEventsOnPage14(void) {
-//    unsigned char i;
-//    unsigned char row;
-//    unsigned char display_index;
-//    RecoveryRecord* event = NULL;
-//    
-//    // 仅保留数据刷新逻辑，不修改原有固定标签（固定显示由DisplayPage14()负责）
-//    for (i = 0; i < 3; i++) {
-//        row = i * 2;
-//        
-//        // 清空数据区域（不影响固定标签）
-//        LCD_DisplayString(row, 64, (unsigned char*)"            ");
-//        
-//        if (i < recovery_event_count) {
-//            // 计算显示索引（最新的在前，与报警事件逻辑一致）
-//            display_index = (recovery_event_next_index - 1 - i + MAX_RECOVERY_EVENTS) % MAX_RECOVERY_EVENTS;
-//            event = &recovery_events[display_index];
-//            
-//            if (event != NULL && event->is_valid) {
-//                // 显示恢复时间（格式：年-月-日，复用原有数据显示位置）
-//                LCD_DisplayNumber(row, 64, event->recovery_timestamp.year, 2);
-//                LCD_DisplayChar(row, 80, '-');
-//                LCD_DisplayNumber(row, 88, event->recovery_timestamp.mon, 2);
-//                LCD_DisplayChar(row, 104, '-');
-//                LCD_DisplayNumber(row, 112, event->recovery_timestamp.day, 2);
-//            } else {
-//                // 无有效数据时显示占位符，与原有风格一致
-//                LCD_DisplayString(row, 64, (unsigned char*)"-- -- --");
-//            }
-//        } else {
-//            // 无事件记录时显示空，保持界面整洁
-//            LCD_DisplayString(row, 64, (unsigned char*)"           ");
-//        }
-//    }
-//}
+
 static void DisplayRecoveryEventsOnPage14(void) {
     unsigned char i;
     unsigned char row;
@@ -2716,7 +2683,7 @@ else if (current_page == PAGE_22) {
                 display_labels_initialized = 0;
             } else if (current_page == PAGE_17) {
                 // 从恢复删除确认返回恢复详细页面（新增）
-                menu_state.current_page = PAGE_15;
+                menu_state.current_page = PAGE_11;
                 menu_state.page_changed = 1;
                 display_labels_initialized = 0;
             } else if (current_page == PAGE_15) {
@@ -2777,7 +2744,7 @@ else if (current_page == PAGE_22) {
             } else if (current_page == PAGE_13) {
                 // 从预警列表进入预警详细（新增）
                 menu_state.prev_page = PAGE_13;
-                menu_state.current_page = PAGE_15;
+                menu_state.current_page = PAGE_11;
                 menu_state.page15_selected = 0;
                 menu_state.page_changed = 1;
                 display_labels_initialized = 0;
