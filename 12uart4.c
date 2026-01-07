@@ -203,7 +203,8 @@ static void UpdateDisplayForPage1(void);//动态刷新page1
 static void UpdateDisplayForPage3(void);//动态刷新page3
 
 
-
+// 新增：PAGE_13 预警事件数据显示
+static void DisplayAlarmEventsOnPage13(void);
 
 static bit Protocol_Check(unsigned char *frame);
 static short ADC_To_Temp(unsigned int adc_val);
@@ -1342,18 +1343,19 @@ static void DisplayPage11(void) {
         // 第一行: ID: PID=    AID=
         LCD_DisplayString(0, 0, "ID");
         LCD_DISPLAYCHAR_NEW(0, 16, 0, 15);  
-        LCD_DisplayString(0, 24, "PID=");
-        LCD_DisplayString(0, 80, "AID=");
-        
+        LCD_DisplayString(0, 24, "PID");
+			  LCD_DISPLAYCHAR_NEW(0, 48, 0, 16);  // 
+        LCD_DisplayString(0, 80, "TX");
+        LCD_DISPLAYCHAR_NEW(0, 96, 0, 16);  // 
         // 第二行: 温度:
         LCD_DISPLAYCHAR_NEW(2, 0, 0, 1);  // "温"
         LCD_DISPLAYCHAR_NEW(2, 8, 1, 1);  // "度"
-        LCD_DisplayChar(2, 16, ':');
+        LCD_DISPLAYCHAR_NEW(0, 16, 0, 15); 
         
         // 第三行: 电压:
-        LCD_DISPLAYCHAR_NEW(4, 0, 0, 3);  // "电"
-        LCD_DISPLAYCHAR_NEW(4, 8, 1, 3);  // "压"
-        LCD_DisplayChar(4, 16, ':');
+        LCD_DISPLAYCHAR_NEW(4, 0, 0, 33);  // "电"
+        LCD_DISPLAYCHAR_NEW(4, 8, 1, 33);  // "压"
+        LCD_DISPLAYCHAR_NEW(0, 16, 0, 15); 
         
         // 第四行: 功能提示
         // 按1删除
@@ -1377,7 +1379,7 @@ static void DisplayPage11(void) {
     
     // 清空数据显示区域
     LCD_DisplayString(0, 56, (unsigned char*)"  ");   // PID显示区域
-    LCD_DisplayString(0, 104, (unsigned char*)"  ");  // AID显示区域
+    LCD_DisplayString(0, 104, (unsigned char*)"  ");  // TX显示区域
     LCD_DisplayString(2, 24, (unsigned char*)"  ");   // 温度显示区域
     LCD_DisplayString(4, 24, (unsigned char*)"    "); // 电压显示区域
     
@@ -1426,56 +1428,84 @@ static void DisplayPage12(void) {
 
 // ------------------- 显示PAGE_13(温度预警时间列表) -------------------
 static void DisplayPage13(void) {
-        unsigned char i;
+    unsigned char i;
     unsigned char row;
     
-    // 只在需要初始化时清屏和绘制固定标签
     if (display_labels_initialized == 0) {
         LCD_Clear();
         
-        // 绘制固定标签
+        // 绘制固定标签：箭头随 page13_selected 变化
         for (i = 0; i < 3; i++) {
             row = i * 2;  
-            
-            if (i == menu_state.page10_selected) {
-                LCD_DISPLAYCHAR_NEW(row, 0, 0, 25);  
+            // 关键：箭头指向当前 page13_selected 选中项（而非 page10_selected）
+            if (i == menu_state.page13_selected) {
+                LCD_DISPLAYCHAR_NEW(row, 0, 0, 25);  // 显示选中箭头
             } else {
-                LCD_DisplayChar(row, 0, ' ');
+                LCD_DisplayChar(row, 0, ' '); // 清除未选中项箭头
             }
             
             LCD_DISPLAYCHAR_NEW(row, 8, 2, 19);   // "事"
             LCD_DISPLAYCHAR_NEW(row, 16, 3, 19);  // "件"
-            LCD_DisplayChar(row, 24, '1' + i);    // 编号
+            LCD_DisplayChar(row, 24, '1' + i);    // 事件编号
             
-            // 显示"时间："标签（位置可能需要调整）
             LCD_DISPLAYCHAR_NEW(row, 40, 2, 20); // "时"
             LCD_DISPLAYCHAR_NEW(row, 48, 3, 20); // "间"
             LCD_DISPLAYCHAR_NEW(row, 56, 0, 15); // ":"
         }
         
-        // 功能提示
+        // 功能提示（与 PAGE_10 一致）
         LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
         LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);   // "一"
         LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);  // "页"
-        
         LCD_DISPLAYCHAR_NEW(6, 40, 3, 4);  // "上"
         LCD_DISPLAYCHAR_NEW(6, 48, 1, 4);  // "一"
         LCD_DISPLAYCHAR_NEW(6, 56, 2, 4);  // "页"
-        
         LCD_DISPLAYCHAR_NEW(6, 80, 0, 26); // "详"
         LCD_DISPLAYCHAR_NEW(6, 88, 1, 26); // "情"
-        
         LCD_DISPLAYCHAR_NEW(6, 112, 0, 11); // "返"
         LCD_DISPLAYCHAR_NEW(6, 120, 1, 11); // "回"
         
         display_labels_initialized = 1;
     }
     
-    // 显示报警事件数据（只刷新数据部分，不清屏）
-    DisplayAlarmEventsOnPage10();
+    // 显示预警事件数据（复用报警的显示函数，或单独实现预警数据显示）
+    DisplayAlarmEventsOnPage13(); // 新增：预警事件数据显示函数
 }
 
 
+// 新增：PAGE_13 预警事件数据显示
+// 修复后：PAGE_13 复用报警事件数组，无需单独预警变量
+static void DisplayAlarmEventsOnPage13(void) {
+    unsigned char i;
+    unsigned char row;
+    unsigned char display_index;
+    AlarmRecord* event = NULL;
+    
+    for (i = 0; i < 3; i++) {
+        row = i * 2;
+        LCD_DisplayString(row, 64, (unsigned char*)"            "); // 清空数据区
+        
+        // 复用报警事件的计数和数组（删除所有 warning_xxx 相关）
+        if (i < alarm_event_count) {
+            // 复用报警事件的索引计算逻辑（MAX_ALARM_EVENTS 已定义）
+            display_index = (alarm_event_next_index - 1 - i + MAX_ALARM_EVENTS) % MAX_ALARM_EVENTS;
+            event = &alarm_events[display_index]; // 复用报警事件数组
+            
+            if (event != NULL && event->is_valid) {
+                // 显示事件时间（与 PAGE_10 格式一致）
+                LCD_DisplayNumber(row, 64, event->timestamp.year, 2);
+                LCD_DisplayChar(row, 80, '-');
+                LCD_DisplayNumber(row, 88, event->timestamp.mon, 2);
+                LCD_DisplayChar(row, 104, '-');
+                LCD_DisplayNumber(row, 112, event->timestamp.day, 2);
+            } else {
+                LCD_DisplayString(row, 64, (unsigned char*)"-- -- --");
+            }
+        } else {
+            LCD_DisplayString(row, 64, (unsigned char*)"           ");
+        }
+    }
+}
 // ------------------- 显示PAGE_14(传感器恢复事件列表) -------------------
 static void DisplayPage14(void) {
     unsigned char i;
@@ -1893,76 +1923,63 @@ static void DisplayPage20(void) {
 
 static void DisplayPage21(void) {
     const unsigned char row_page[3] = {0, 2, 4}; 
-    static unsigned int flash_timer = 0;
-    static bit flash_state = 1;
     short max_temps[3];
-    int i; // 注意：STC编译器中 int 是 16 位，需确保与数组索引匹配
+    int i; // STC编译器中int为16位，适配数组索引
     rtc_time_t max_temp_times[3];
     
     GetMaxTempRecords(max_temps, max_temp_times);
     
-    // 恢复局部闪烁逻辑，使用全局 FLASH_INTERVAL 宏
-    flash_timer++;
-    if (flash_timer >= FLASH_INTERVAL) {
-        flash_timer = 0;
-        flash_state = !flash_state;
-    }
-    
-    LCD_Clear(); // 清屏（确保 LCD_Clear 函数声明为 void 类型，无返回值冲突）
+    LCD_Clear(); // 清屏（确保LCD_Clear为void类型，无返回值冲突）
     
     for (i = 0; i < 3; i++) {
-        unsigned char curr_page = row_page[i]; // 局部变量，无重复定义
-        unsigned char selected_row = menu_state.page21_selected; // 改为 unsigned char（与 page21_selected 类型一致）
+        unsigned char curr_page = row_page[i]; // 当前显示行
+        unsigned char selected_row = menu_state.page21_selected; // 选中行索引
         
+        // 1. 显示选中箭头：仅选中行显示箭头，未选中行清空
         if (i == selected_row) {
-            if (flash_state) {
-                if (max_temps[i] != -990) {
-                    // 修复：强制类型转换为 unsigned long，避免数值截断
-                    LCD_DisplayNumber(curr_page, 0, (unsigned long)(max_temps[i]/10), 2);
-                    LCD_DISPLAYCHAR_NEW(curr_page, 16, 0, 2);
-                    LCD_DisplayNumber(curr_page, 32, (unsigned long)max_temp_times[i].mon, 2);
-                    LCD_DISPLAYCHAR_NEW(curr_page, 48, 1, 15);
-                    LCD_DisplayNumber(curr_page, 56, (unsigned long)max_temp_times[i].day, 2);
-                    LCD_DisplayNumber(curr_page, 88, (unsigned long)max_temp_times[i].hour, 2);
-                    LCD_DISPLAYCHAR_NEW(curr_page, 104, 0, 15);
-                    LCD_DisplayNumber(curr_page, 112, (unsigned long)max_temp_times[i].min, 2);
-                } else {
-                    LCD_DisplayString(curr_page, 0, (unsigned char*)"  C -- -- --:--");
-                }
-            } else {
-                LCD_ClearPages(curr_page, curr_page);
-                LCD_DisplayString(curr_page, 0, (unsigned char*)"     -- -- --:--");
-            }
+            LCD_DISPLAYCHAR_NEW(curr_page, 0, 0, 25); // 显示选中箭头（与其他页面箭头样式一致）
         } else {
-            if (max_temps[i] != -990) {
-                LCD_DisplayNumber(curr_page, 0, (unsigned long)(max_temps[i]/10), 2);
-                LCD_DISPLAYCHAR_NEW(curr_page, 16, 0, 2);
-                LCD_DisplayNumber(curr_page, 32, (unsigned long)max_temp_times[i].mon, 2);
-                LCD_DISPLAYCHAR_NEW(curr_page, 48, 1, 15);
-                LCD_DisplayNumber(curr_page, 56, (unsigned long)max_temp_times[i].day, 2);
-                LCD_DisplayNumber(curr_page, 88, (unsigned long)max_temp_times[i].hour, 2);
-                LCD_DISPLAYCHAR_NEW(curr_page, 104, 0, 15);
-                LCD_DisplayNumber(curr_page, 112, (unsigned long)max_temp_times[i].min, 2);
-            } else {
-                LCD_DisplayString(curr_page, 0, (unsigned char*)"  C -- -- --:--");
-            }
+            LCD_DisplayChar(curr_page, 0, ' '); // 未选中行清空箭头位置
+        }
+        
+        // 2. 显示温度、时间数据（保留原逻辑，去除闪烁判断）
+        if (max_temps[i] != -990) {
+            // 温度（放大10倍→整数，如255→25℃）
+            LCD_DisplayNumber(curr_page, 8, (unsigned long)(max_temps[i]/10), 2);
+            LCD_DISPLAYCHAR_NEW(curr_page, 24, 0, 2); // "℃"符号
+            // 日期（月-日）
+            LCD_DisplayNumber(curr_page, 40, (unsigned long)max_temp_times[i].mon, 2);
+            LCD_DISPLAYCHAR_NEW(curr_page, 56, 1, 15); // "-"分隔符
+            LCD_DisplayNumber(curr_page, 64, (unsigned long)max_temp_times[i].day, 2);
+            // 时间（时:分）
+            LCD_DisplayNumber(curr_page, 88, (unsigned long)max_temp_times[i].hour, 2);
+            LCD_DISPLAYCHAR_NEW(curr_page, 104, 0, 15); // ":"分隔符
+            LCD_DisplayNumber(curr_page, 112, (unsigned long)max_temp_times[i].min, 2);
+        } else {
+            // 无有效数据时显示占位符
+            LCD_DisplayString(curr_page, 8, (unsigned char*)"--"); // 温度占位
+            LCD_DISPLAYCHAR_NEW(curr_page, 24, 0, 2); // "℃"符号
+            LCD_DisplayString(curr_page, 40, (unsigned char*)"--"); // 月占位
+            LCD_DISPLAYCHAR_NEW(curr_page, 56, 1, 15); // "-"分隔符
+            LCD_DisplayString(curr_page, 64, (unsigned char*)"--"); // 日占位
+            LCD_DisplayString(curr_page, 88, (unsigned char*)"--"); // 时占位
+            LCD_DISPLAYCHAR_NEW(curr_page, 104, 0, 15); // ":"分隔符
+            LCD_DisplayString(curr_page, 112, (unsigned char*)"--"); // 分占位
         }
     }
     
-    // 功能提示（保持不变）
+    // 功能提示（保持原样式不变）
     LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);
     LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);
     LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);
     LCD_DISPLAYCHAR_NEW(6, 40, 3, 4);
     LCD_DISPLAYCHAR_NEW(6, 48, 1, 4);
     LCD_DISPLAYCHAR_NEW(6, 56, 2, 4);
-    LCD_DISPLAYCHAR_NEW(6, 72, 0, 26);
-    LCD_DISPLAYCHAR_NEW(6, 80, 1, 26);
+    LCD_DISPLAYCHAR_NEW(6, 80, 0, 26);
+    LCD_DISPLAYCHAR_NEW(6, 88, 1, 26);
     LCD_DISPLAYCHAR_NEW(6, 112, 0, 11);
     LCD_DISPLAYCHAR_NEW(6, 120, 1, 11);
 }
-
-
 // ------------------- 显示PAGE_22(最高温度清除确认页面) -------------------
 static void DisplayPage22(void) {
     // 1. 变量定义：读取 PAGE_21 选中的最高温记录
@@ -3163,12 +3180,18 @@ static void HandlePrevItem(void)
             }
             break;
         case PAGE_13:
-            if (menu_state.page13_selected > 0) {
-                menu_state.page13_selected--;
-                menu_state.page_changed = 1;
-                display_labels_initialized = 0;
-            }
-            break;
+//            if (menu_state.page13_selected > 0) {
+//                menu_state.page13_selected--;
+//                menu_state.page_changed = 1;
+//                display_labels_initialized = 0;
+//            }
+//            break;
+						 if (menu_state.page13_selected > 0) {
+        menu_state.page13_selected--; // 选中索引上移
+        display_labels_initialized = 0; // 刷新显示
+        RefreshDisplay();
+    }
+    break;
         case PAGE_14:
             if (menu_state.page14_selected > 0) {
                 menu_state.page14_selected--;
@@ -3291,12 +3314,18 @@ static void HandleNextItem(void)
             }
             break;
         case PAGE_13:
-            if (menu_state.page13_selected < 2) {
-                menu_state.page13_selected++;
-                menu_state.page_changed = 1;
-                display_labels_initialized = 0;
-            }
-            break;
+//            if (menu_state.page13_selected < 2) {
+//                menu_state.page13_selected++;
+//                menu_state.page_changed = 1;
+//                display_labels_initialized = 0;
+//            }
+//            break;
+				 if (menu_state.page13_selected < 2) {
+        menu_state.page13_selected++; // 选中索引下移
+        display_labels_initialized = 0; // 刷新显示
+        RefreshDisplay();
+    }
+    break;
         case PAGE_14:
             if (menu_state.page14_selected < 2) {
                 menu_state.page14_selected++;
