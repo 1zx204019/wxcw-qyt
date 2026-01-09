@@ -2599,10 +2599,7 @@ void UART4_ReceiveString(void) {
 				else if (menu_state.current_page == PAGE_14) {
     DisplayRecoveryEventsOnPage14(); // 新增：刷新PAGE_14恢复事件
 } 
-    else if (menu_state.current_page == PAGE_21) {
-        DisplayPage21(); // 每调用一次UART4_ReceiveString，就刷新一次PAGE_21
-    }
-        if (menu_state.current_page == PAGE_25 && pwd_flash_state) {
+       else if (menu_state.current_page == PAGE_25 && pwd_flash_state) {
         DisplayPassword(); // 仅在闪烁中时刷新，提升效率
     }
         UART4_ClearBuffer(uart_rx_buff, 6);
