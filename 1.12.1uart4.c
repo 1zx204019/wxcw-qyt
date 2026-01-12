@@ -12,7 +12,7 @@
 #define NULL ((void*)0)
 #endif
 
-// ------------------- 全局变量定义 -------------------
+// ------------------- 全局变量定义， -------------------
 // UART通信相关
 unsigned char uart_rx_buff[UART_BUFF_SIZE] = {0};  // 接收缓冲区
 unsigned char uart_rx_len = 0;                     // 接收长度
