@@ -1886,7 +1886,7 @@ static void DisplayPage21(void) {
     const unsigned char row_page[3] = {0, 2, 4}; 
     int i;
     
-    // 关键：这里调用了 GetMaxTempRecords，我们需要确保它不重新计算
+    // 关键：调用函数更新最高温数据
     GetMaxTempRecords(max_temps, max_temp_times);
     
     LCD_Clear();
@@ -1902,7 +1902,7 @@ static void DisplayPage21(void) {
             LCD_DisplayChar(curr_page, 0, ' ');
         }
         
-        // 关键修改：检查是否为无效数据（-990 表示已删除）
+        // 显示温度
         if (max_temps[i] != -990 && max_temp_times[i].year != 0) {
             // 显示有效数据
             LCD_DisplayNumber(curr_page, 8, (unsigned long)(max_temps[i]/10), 2);
@@ -2553,7 +2553,10 @@ void UART4_ReceiveString(void) {
         else if (menu_state.current_page == PAGE_25 && pwd_flash_state) {
             DisplayPassword(); // 仅在闪烁中时刷新，提升效率
         }
-        
+//          else if (menu_state.current_page == PAGE_21) {
+//            display_labels_initialized = 0;  // 强制重新绘制
+//            DisplayFixedLabels();
+//        }
         UART4_ClearBuffer(uart_rx_buff, 6);
         uart_rx_complete = 0;
         uart_rx_len = 0;
@@ -3912,9 +3915,11 @@ static void GetMaxTempRecords_Ext(short max_temps[], rtc_time_t max_temp_times[]
 // 兼容层函数：保持原函数签名，内部调用扩展函数
 static void GetMaxTempRecords(short max_temps[], rtc_time_t max_temp_times[]) {
     unsigned char i;
-    CheckDailyMaxTemp(); // 强制更新数据源
     
-    // 双重校验：数据源有效才赋值，否则置为无效
+    // 强制更新最高温数据
+    CheckDailyMaxTemp();
+    
+    // 将数据复制到传入的数组中
     for (i = 0; i < 3; i++) {
         if (daily_max_temps[i].is_valid && daily_max_temps[i].max_temp != -990) {
             max_temps[i] = daily_max_temps[i].max_temp;
@@ -4162,12 +4167,16 @@ static void CheckDailyMaxTemp(void) {
         daily_max_temps[0].is_valid = 0;
         daily_max_temps[0].max_temp = -990;
         
-        // 重置当天删除标志（新的一天重新允许计算）
-        disable_today_max_calc = 0;
+        // 关键修复：跨天时重置删除标志（新的一天允许计算最高温）
+        disable_today_max_calc = 0;  // 新增这行
         
+        // 更新日期记录
         current_system_date[0] = curr_time.year;
         current_system_date[1] = curr_time.mon;
         current_system_date[2] = curr_time.day;
+        
+        // 调试信息
+        UART4_SendString("New day detected, reset max temp calculation.\r\n");
     }
     
     // 关键修改：如果当天最高温已被删除，则不重新计算
@@ -4248,15 +4257,17 @@ void DeleteMaxTempEvent(unsigned char display_index) {
     daily_max_temps[display_index].volt_mv = 0;
     memset(&daily_max_temps[display_index].temp_time, 0, sizeof(rtc_time_t));
     
-    // 2. 同步清空全局缓存（PAGE_21 直接读取的缓存）
+    // 2. 同步清空全局缓存
     max_temps[display_index] = -990;
     memset(&max_temp_times[display_index], 0, sizeof(rtc_time_t));
     
-    // 3. 关键：如果是删除当天数据（display_index == 0），禁止重新计算
+    // 3. 关键修改：只有当删除的是当天数据（索引0）时才禁止重新计算
     if (display_index == 0) {
         disable_today_max_calc = 1;  // 禁止重新计算当天最高温
         UART4_SendString("Today's max temp deleted, disabled recalculation.\r\n");
     } else {
+        // 对于历史数据（索引1或2），不需要禁止计算
+        // 注意：这里我们允许跨天时自动重置disable_today_max_calc
         UART4_SendString("History max temp deleted.\r\n");
     }
 }
