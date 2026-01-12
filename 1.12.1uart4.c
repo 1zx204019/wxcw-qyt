@@ -4244,6 +4244,7 @@ static void CheckDailyMaxTemp(void) {
 // ------------------- 删除指定最高温事件 -------------------
 // 版本B：简单标记为无效（不移动数据，更简单稳定）
 //  删除指定最高温事件（完善字段清空）
+// ------------------- 删除指定最高温事件 -------------------
 void DeleteMaxTempEvent(unsigned char display_index) {
     if (display_index >= 3) {
         return;
@@ -4261,13 +4262,15 @@ void DeleteMaxTempEvent(unsigned char display_index) {
     max_temps[display_index] = -990;
     memset(&max_temp_times[display_index], 0, sizeof(rtc_time_t));
     
-    // 3. 关键修改：只有当删除的是当天数据（索引0）时才禁止重新计算
+    // 3. 关键修改：删除后重新计算当天最高温（不禁止计算）
     if (display_index == 0) {
-        disable_today_max_calc = 1;  // 禁止重新计算当天最高温
-        UART4_SendString("Today's max temp deleted, disabled recalculation.\r\n");
+        // 调用 CheckDailyMaxTemp 重新计算当天最高温
+        disable_today_max_calc = 0;  // 确保允许计算
+        CheckDailyMaxTemp();         // 立即重新计算
+        
+        UART4_SendString("Today's max temp deleted, recalculating...\r\n");
     } else {
-        // 对于历史数据（索引1或2），不需要禁止计算
-        // 注意：这里我们允许跨天时自动重置disable_today_max_calc
+        // 对于历史数据（索引1或2），不需要重新计算
         UART4_SendString("History max temp deleted.\r\n");
     }
 }
