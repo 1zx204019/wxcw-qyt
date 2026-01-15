@@ -1759,26 +1759,29 @@ static void DisplayPage18(void) {
     // 第二步：可执行代码（变量声明后再写逻辑）
     if (display_labels_initialized == 0) {
         LCD_Clear();
-        // 固定字符：按要求布局（ID: + PID + 冒号 + TX），3行数据行
+        // 固定字符：列坐标统一+8，腾出第0列放箭头
         // 第0行（第一行数据）
-        LCD_DisplayString(0, 0, (unsigned char*)"ID:");
-        LCD_DisplayString(0, 24, (unsigned char*)"PID");
-        LCD_DISPLAYCHAR_NEW(0, 48, 0, 16); // 冒号 ":"
-        LCD_DisplayString(0, 80, (unsigned char*)"TX");
+        LCD_DisplayString(0, 8, (unsigned char*)"ID");          // 原0列→8列
+        LCD_DISPLAYCHAR_NEW(0, 24, 0, 15); // 冒号（原16列→24列）
+        LCD_DisplayString(0, 32, (unsigned char*)"PID");       // 原24列→32列
+        LCD_DISPLAYCHAR_NEW(0, 56, 0, 16); // 等号（原48列→56列）
+        LCD_DisplayString(0, 88, (unsigned char*)"TX");        // 原80列→88列
         
         // 第2行（第二行数据）
-        LCD_DisplayString(2, 0, (unsigned char*)"ID:");
-        LCD_DisplayString(2, 24, (unsigned char*)"PID");
-        LCD_DISPLAYCHAR_NEW(2, 48, 0, 16); // 冒号 ":"
-        LCD_DisplayString(2, 80, (unsigned char*)"TX");
+        LCD_DisplayString(2, 8, (unsigned char*)"ID");          // 原0列→8列
+        LCD_DISPLAYCHAR_NEW(2, 24, 0, 15); // 冒号（原16列→24列）
+        LCD_DisplayString(2, 32, (unsigned char*)"PID");       // 原24列→32列
+        LCD_DISPLAYCHAR_NEW(2, 56, 0, 16); // 等号（原48列→56列）
+        LCD_DisplayString(2, 88, (unsigned char*)"TX");        // 原80列→88列
         
         // 第4行（第三行数据）
-        LCD_DisplayString(4, 0, (unsigned char*)"ID:");
-        LCD_DisplayString(4, 24, (unsigned char*)"PID");
-        LCD_DISPLAYCHAR_NEW(4, 48, 0, 16); // 冒号 ":"
-        LCD_DisplayString(4, 80, (unsigned char*)"TX");
+        LCD_DisplayString(4, 8, (unsigned char*)"ID");          // 原0列→8列
+        LCD_DISPLAYCHAR_NEW(4, 24, 0, 15); // 冒号（原16列→24列）
+        LCD_DisplayString(4, 32, (unsigned char*)"PID");       // 原24列→32列
+        LCD_DISPLAYCHAR_NEW(4, 56, 0, 16); // 等号（原48列→56列）
+        LCD_DisplayString(4, 88, (unsigned char*)"TX");        // 原80列→88列
 
-        // 功能提示（保留你提供的固定字符）
+        // 功能提示：列坐标统一+8，保持布局一致
         LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
         LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);   // "一"
         LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);  // "项"
@@ -1793,16 +1796,19 @@ static void DisplayPage18(void) {
         display_labels_initialized = 1;
     }
 
-    // 清空数据显示区域（仅保留必要清除，删除PID前缀清除、箭头指示）
+    // 清空数据显示区域+箭头区域，避免残留
     for (i = 0; i < 3; i++) {
         row = i * 2;
-        // 仅清除TX后面的数字区域和PID值区域，避免数据残留
-        LCD_DisplayString(row, 56, (unsigned char*)"  ");    // PID值显示区（冒号后面）
-        LCD_DisplayString(row, 96, (unsigned char*)"   ");   // TX值显示区（TX后面）
+        LCD_DisplayChar(row, 0, ' '); // 清空箭头位置
+        LCD_DisplayString(row, 64, (unsigned char*)"  ");    // PID值显示区（原56列→64列，右移8）
+        LCD_DisplayString(row, 104, (unsigned char*)"   ");   // TX值显示区（原96列→104列，右移8）
     }
 
-    // 显示当前选中从站的数据（核心优化：优先实时数据，切换即显示）
+    // 显示当前选中从站的箭头（第0列）
     curr_row = curr_slave * 2;
+    LCD_DISPLAYCHAR_NEW(curr_row, 0, 0, 25); // 箭头标识选中从站
+
+    // 显示当前选中从站的数据（核心优化：优先实时数据，切换即显示）
     // 1. 仅生成TX后的数字（如01/02，不再拼接TX前缀）
     dev_tx_num[0] = '0' + aid; // AID=1→'1'，AID=2→'2'，AID=3→'3'
     dev_tx_num[1] = '\0';
@@ -1811,20 +1817,20 @@ static void DisplayPage18(void) {
     if (realtime_data != NULL && realtime_data->is_valid) {
         // 优先显示实时数据（切换后立即加载，无需等历史数据）
         pid_val = realtime_data->pid;
-        LCD_DisplayNumber(curr_row, 56, (unsigned long)pid_val, 2);
+        LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2); // 原56列→64列
     } else {
         // 实时数据无，读取历史数据
         if (hist_pos < TOTAL_RECORDS && data_summary[hist_pos].is_valid) {
             history_data = &data_summary[hist_pos];
             pid_val = history_data->pid;
-            LCD_DisplayNumber(curr_row, 56, (unsigned long)pid_val, 2);
+            LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2); // 原56列→64列
         } else {
-            LCD_DisplayString(curr_row, 56, (unsigned char*)"--"); // 无任何数据时显示--
+            LCD_DisplayString(curr_row, 64, (unsigned char*)"--"); // 无任何数据时显示--（原56列→64列）
         }
     }
     
     // 3. 显示TX后面的数字（如01/02）
-    LCD_DisplayString(curr_row, 96, dev_tx_num);
+    LCD_DisplayString(curr_row, 104, dev_tx_num); // 原96列→104列
 
     // 显示其他从站的最新数据（非选中从站只显示最新一条，同样优先实时数据）
     for (i = 0; i < 3; i++) {
@@ -1838,12 +1844,12 @@ static void DisplayPage18(void) {
         other_data = GetRecentDataByAID(other_aid);
         if (other_data != NULL && other_data->is_valid) {
             // 显示PID（自动读取解析后的数值）
-            LCD_DisplayNumber(row, 56, (unsigned long)other_data->pid, 2);
+            LCD_DisplayNumber(row, 64, (unsigned long)other_data->pid, 2); // 原56列→64列
         } else {
-            LCD_DisplayString(row, 56, (unsigned char*)"--"); // PID无数据显示--
+            LCD_DisplayString(row, 64, (unsigned char*)"--"); // PID无数据显示--（原56列→64列）
         }
         // 显示TX后面的数字
-        LCD_DisplayString(row, 96, other_tx_num);
+        LCD_DisplayString(row, 104, other_tx_num); // 原96列→104列
     }
 }
 
