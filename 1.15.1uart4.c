@@ -777,14 +777,14 @@ static void DisplayPage1(void) {
     }
     
     // 第6行：功能提示
-    LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
+    LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "上"
     LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);   // "一"
     LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);  // "页"
-    LCD_DISPLAYCHAR_NEW(6, 48, 3, 4);  // "上"
-    LCD_DISPLAYCHAR_NEW(6, 56, 1, 4);  // "一"
-    LCD_DISPLAYCHAR_NEW(6, 64, 2, 4);  // "页"
-    LCD_DISPLAYCHAR_NEW(6, 104, 0, 5); // "返"
-    LCD_DISPLAYCHAR_NEW(6, 112, 1, 5); // "回"
+    LCD_DISPLAYCHAR_NEW(6, 56, 3, 4);  // "下"
+    LCD_DISPLAYCHAR_NEW(6, 64, 1, 4);  // "一"
+    LCD_DISPLAYCHAR_NEW(6, 72, 2, 4);  // "页"
+    LCD_DISPLAYCHAR_NEW(6, 112, 0, 5); // "设"
+    LCD_DISPLAYCHAR_NEW(6, 120, 1, 5); // "置"
     
     display_labels_initialized = 1;
 }
@@ -1736,6 +1736,23 @@ static void DisplayPage17(void) {
     LCD_DISPLAYCHAR_NEW(6, 120, 1, 11);  // "回"
 }
 
+
+// 局部刷新PAGE_18箭头位置（仅控制选中箭头，不影响其他内容）
+static void RefreshPage18Arrow(void) {
+    unsigned char i;
+    unsigned char row;
+    
+    for (i = 0; i < 3; i++) {
+        row = i * 2; // 对应3个从站的显示行（0、2、4行）
+        
+        // 箭头仅在当前选中的从站行显示，其他行清空
+        if (i == menu_state.page18_selected) {
+            LCD_DISPLAYCHAR_NEW(row, 0, 0, 25); // 显示选中箭头
+        } else {
+            LCD_DisplayChar(row, 0, ' '); // 清除未选中行箭头
+        }
+    }
+}
 static void DisplayPage18(void) {
     // 第一步：所有局部变量集中声明在函数开头（C89标准要求）
     unsigned char i;
@@ -1746,43 +1763,41 @@ static void DisplayPage18(void) {
     unsigned char hist_idx = page18_hist_index[curr_slave]; // 当前选中的历史数据索引（0-3）
     unsigned short hist_pos = hist_start + hist_idx;
     unsigned char curr_row;
-    unsigned char dev_tx_num[3]; // 仅存储TX后的数字（如01/02），不再拼接TX前缀
+    unsigned char dev_tx_num[3]; // 仅存储TX后的数字（如01/02）
     unsigned char other_aid;
     unsigned char other_tx_num[3]; // 其他从站TX数字
     unsigned char pid_val; // 存储解析后的PID值
     unsigned char row;
     DataRecord* other_data = NULL; // 其他从站数据
-    // 新增：优先读取实时数据（切换后立即显示，无需等历史数据）
-    DataRecord* realtime_data = GetRecentDataByAID(aid); // 实时数据（最新传输的）
+    DataRecord* realtime_data = GetRecentDataByAID(aid); // 实时数据
     DataRecord* history_data = NULL; // 历史数据（备用）
+    static unsigned char last_start_idx = 0xFF; // 跟踪上一次起始索引（复用PAGE_7逻辑）
+    unsigned char start_idx = 0; // PAGE_18无滚动，起始索引固定为0
 
-    // 第二步：可执行代码（变量声明后再写逻辑）
+    // 第二步：仅首次初始化时绘制固定标签（复用PAGE_7逻辑）
     if (display_labels_initialized == 0) {
         LCD_Clear();
-        // 固定字符：列坐标统一+8，腾出第0列放箭头
+        // 固定字符：ID、PID、TX（列坐标右移8列，腾出箭头位置）
         // 第0行（第一行数据）
-        LCD_DisplayString(0, 8, (unsigned char*)"ID");          // 原0列→8列
-        LCD_DISPLAYCHAR_NEW(0, 24, 0, 15); // 冒号（原16列→24列）
-        LCD_DisplayString(0, 32, (unsigned char*)"PID");       // 原24列→32列
-        LCD_DISPLAYCHAR_NEW(0, 56, 0, 16); // 等号（原48列→56列）
-        LCD_DisplayString(0, 88, (unsigned char*)"TX");        // 原80列→88列
+        LCD_DisplayString(0, 8, (unsigned char*)"ID:");
+        LCD_DisplayString(0, 32, (unsigned char*)"PID");
+        LCD_DISPLAYCHAR_NEW(0, 56, 0, 16); // 冒号 ":"
+        LCD_DisplayString(0, 88, (unsigned char*)"TX");
         
         // 第2行（第二行数据）
-        LCD_DisplayString(2, 8, (unsigned char*)"ID");          // 原0列→8列
-        LCD_DISPLAYCHAR_NEW(2, 24, 0, 15); // 冒号（原16列→24列）
-        LCD_DisplayString(2, 32, (unsigned char*)"PID");       // 原24列→32列
-        LCD_DISPLAYCHAR_NEW(2, 56, 0, 16); // 等号（原48列→56列）
-        LCD_DisplayString(2, 88, (unsigned char*)"TX");        // 原80列→88列
+        LCD_DisplayString(2, 8, (unsigned char*)"ID:");
+        LCD_DisplayString(2, 32, (unsigned char*)"PID");
+        LCD_DISPLAYCHAR_NEW(2, 56, 0, 16); // 冒号 ":"
+        LCD_DisplayString(2, 88, (unsigned char*)"TX");
         
         // 第4行（第三行数据）
-        LCD_DisplayString(4, 8, (unsigned char*)"ID");          // 原0列→8列
-        LCD_DISPLAYCHAR_NEW(4, 24, 0, 15); // 冒号（原16列→24列）
-        LCD_DisplayString(4, 32, (unsigned char*)"PID");       // 原24列→32列
-        LCD_DISPLAYCHAR_NEW(4, 56, 0, 16); // 等号（原48列→56列）
-        LCD_DisplayString(4, 88, (unsigned char*)"TX");        // 原80列→88列
+        LCD_DisplayString(4, 8, (unsigned char*)"ID:");
+        LCD_DisplayString(4, 32, (unsigned char*)"PID");
+        LCD_DISPLAYCHAR_NEW(4, 56, 0, 16); // 冒号 ":"
+        LCD_DisplayString(4, 88, (unsigned char*)"TX");
 
-        // 功能提示：列坐标统一+8，保持布局一致
-        LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
+        // 功能提示（固定绘制一次）
+       LCD_DISPLAYCHAR_NEW(6, 0, 0, 4);   // "下"
         LCD_DISPLAYCHAR_NEW(6, 8, 1, 4);   // "一"
         LCD_DISPLAYCHAR_NEW(6, 16, 2, 4);  // "项"
         LCD_DISPLAYCHAR_NEW(6, 40, 3, 4);  // "上"
@@ -1793,66 +1808,62 @@ static void DisplayPage18(void) {
         LCD_DISPLAYCHAR_NEW(6, 112, 0, 11); // "返"
         LCD_DISPLAYCHAR_NEW(6, 120, 1, 11); // "回"
 
-        display_labels_initialized = 1;
+        display_labels_initialized = 1; // 标记标签已绘制，后续不再重绘
+        last_start_idx = 0xFF; // 强制首次更新逻辑
     }
 
-    // 清空数据显示区域+箭头区域，避免残留
+    // 仅起始索引变化时才执行文本更新（PAGE_7核心逻辑，避免冗余刷新）
+    if (last_start_idx != start_idx) {
+        last_start_idx = start_idx;
+    }
+
+    // 第三步：每次调用都刷新箭头（核心局部刷新）
+    RefreshPage18Arrow();
+
+    // 第四步：仅清空并刷新数据区域（PID、TX数字），不影响标签和箭头
     for (i = 0; i < 3; i++) {
         row = i * 2;
-        LCD_DisplayChar(row, 0, ' '); // 清空箭头位置
-        LCD_DisplayString(row, 64, (unsigned char*)"  ");    // PID值显示区（原56列→64列，右移8）
-        LCD_DisplayString(row, 104, (unsigned char*)"   ");   // TX值显示区（原96列→104列，右移8）
+        LCD_DisplayString(row, 64, (unsigned char*)"  ");    // PID值显示区（右移后位置）
+        LCD_DisplayString(row, 104, (unsigned char*)"   ");   // TX值显示区（右移后位置）
     }
 
-    // 显示当前选中从站的箭头（第0列）
+    // 显示当前选中从站的数据
     curr_row = curr_slave * 2;
-    LCD_DISPLAYCHAR_NEW(curr_row, 0, 0, 25); // 箭头标识选中从站
-
-    // 显示当前选中从站的数据（核心优化：优先实时数据，切换即显示）
-    // 1. 仅生成TX后的数字（如01/02，不再拼接TX前缀）
-    dev_tx_num[0] = '0' + aid; // AID=1→'1'，AID=2→'2'，AID=3→'3'
+    // 生成TX后的数字（如01/02）
+    dev_tx_num[0] = '0' + aid;
     dev_tx_num[1] = '\0';
     
-    // 2. 读取解析后的PID（优先实时数据，无则读历史数据，最后显示--）
+    // 读取并显示PID（优先实时数据）
     if (realtime_data != NULL && realtime_data->is_valid) {
-        // 优先显示实时数据（切换后立即加载，无需等历史数据）
         pid_val = realtime_data->pid;
-        LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2); // 原56列→64列
+        LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2);
     } else {
-        // 实时数据无，读取历史数据
         if (hist_pos < TOTAL_RECORDS && data_summary[hist_pos].is_valid) {
             history_data = &data_summary[hist_pos];
             pid_val = history_data->pid;
-            LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2); // 原56列→64列
+            LCD_DisplayNumber(curr_row, 64, (unsigned long)pid_val, 2);
         } else {
-            LCD_DisplayString(curr_row, 64, (unsigned char*)"--"); // 无任何数据时显示--（原56列→64列）
+            LCD_DisplayString(curr_row, 64, (unsigned char*)"--");
         }
     }
-    
-    // 3. 显示TX后面的数字（如01/02）
-    LCD_DisplayString(curr_row, 104, dev_tx_num); // 原96列→104列
+    LCD_DisplayString(curr_row, 104, dev_tx_num);
 
-    // 显示其他从站的最新数据（非选中从站只显示最新一条，同样优先实时数据）
+    // 显示其他从站的数据
     for (i = 0; i < 3; i++) {
         if (i == curr_slave) continue;
         row = i * 2;
         other_aid = i + 1;
-        // 生成其他从站TX后的数字
         other_tx_num[0] = '0' + other_aid;
         other_tx_num[1] = '\0';
-        // 读取其他从站的PID（优先实时数据）
         other_data = GetRecentDataByAID(other_aid);
         if (other_data != NULL && other_data->is_valid) {
-            // 显示PID（自动读取解析后的数值）
-            LCD_DisplayNumber(row, 64, (unsigned long)other_data->pid, 2); // 原56列→64列
+            LCD_DisplayNumber(row, 64, (unsigned long)other_data->pid, 2);
         } else {
-            LCD_DisplayString(row, 64, (unsigned char*)"--"); // PID无数据显示--（原56列→64列）
+            LCD_DisplayString(row, 64, (unsigned char*)"--");
         }
-        // 显示TX后面的数字
-        LCD_DisplayString(row, 104, other_tx_num); // 原96列→104列
+        LCD_DisplayString(row, 104, other_tx_num);
     }
 }
-
 // ------------------- 显示PAGE_19(清除历史数据确认页面) -------------------
 static void DisplayPage19(void) {
     unsigned char curr_slave = menu_state.page18_selected; // 当前选中从站（0-2，对应TX01-TX03）
@@ -3290,10 +3301,11 @@ static void HandlePrevItem(void)
             break;
             
         case PAGE_18:  // 新增：PAGE_18上一项
-            if (menu_state.page18_selected > 0) {
-                menu_state.page18_selected--; // 选中从站索引减1
-                display_labels_initialized = 0; // 刷新显示
-            }
+              if (menu_state.page18_selected > 0) {
+        menu_state.page18_selected--; // 仅更新选中索引
+        RefreshPage18Arrow(); // 只刷新箭头，不重置display_labels_initialized
+        menu_state.page_changed = 1;
+    }
             break;
             
   
@@ -3417,10 +3429,11 @@ static void HandleNextItem(void)
             break;
             
         case PAGE_18:  // 新增：PAGE_18下一项
-            if (menu_state.page18_selected < 2) { // 3个从站（0/1/2），最大索引2
-                menu_state.page18_selected++; // 选中从站索引加1
-                display_labels_initialized = 0; // 刷新显示
-            }
+             if (menu_state.page18_selected < 2) { // 3个从站（0/1/2），最大索引2
+        menu_state.page18_selected++; // 仅更新选中索引
+        RefreshPage18Arrow(); // 只刷新箭头，不重置display_labels_initialized
+        menu_state.page_changed = 1;
+    }
             break;
             
     
@@ -3691,14 +3704,21 @@ static void HandleReturnKey(void)
 // ------------------- 刷新显示 -------------------
 static void RefreshDisplay(void) {
     if (menu_state.page_changed) {
-        // 关键：添加PAGE_21/PAGE_22，强制重置显示标记
-        if (menu_state.current_page != PAGE_2 && menu_state.current_page != PAGE_7 && menu_state.current_page != PAGE_8) {
+        // 关键：添加 PAGE_18 到白名单，与 PAGE_2/PAGE_7/PAGE_8 一致仅刷新箭头
+        if (menu_state.current_page != PAGE_2 && menu_state.current_page != PAGE_7 && 
+            menu_state.current_page != PAGE_8 && menu_state.current_page != PAGE_18) {
             display_labels_initialized = 0;
             DisplayFixedLabels();
         } else if (menu_state.current_page == PAGE_2) {
             RefreshPage2Arrow();
-        } 
-        // 新增：PAGE_21/PAGE_22强制刷新
+        } else if (menu_state.current_page == PAGE_7) {
+            RefreshPage7Arrow();
+        } else if (menu_state.current_page == PAGE_8) {
+            RefreshPage8Arrow();
+        } else if (menu_state.current_page == PAGE_18) { // 新增 PAGE_18 分支
+            RefreshPage18Arrow(); // 仅刷新箭头，不重置固定标签
+        }
+        // 保留 PAGE_21/PAGE_22 强制刷新逻辑
         else if (menu_state.current_page == PAGE_21 || menu_state.current_page == PAGE_22) {
             display_labels_initialized = 0;
             DisplayFixedLabels();
